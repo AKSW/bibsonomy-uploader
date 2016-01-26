@@ -1,12 +1,30 @@
-*.class
+.buildpath
+.classpath
+.project
+.settings
+target
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+cache
 
-# Package Files #
 *.jar
-*.war
-*.ear
+*.toc
+*.out
+*.pdf
+*.aux
+*.log
+*.bbl
+*.blg
+*.dsc
+*.deb
+*.build
+*.changes
+*.gz
+*.substvars
+*.swp
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
+deptree.txt
+dependency-tree.txt
+
+trash
+tmp
+
