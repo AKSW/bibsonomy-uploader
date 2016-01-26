@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Source the global lodtenant.conf file in order to get the defaultProfile
+#. /etc/aksw-bibsonomy-uploader/lodtenant.conf
+
+# TODO Allow searching for config e.g. in the user dir, such as ~/.config/lodtenant/
+
+#echo "Using profile: $defaultProfile"
+#activeProfileName="$defaultProfile"
+
+
+#activeProfileFile="/etc/lodtenant/profiles.d/$activeProfileName.json.conf"
+
+java -cp "/usr/share/lib/aksw-bibsonomy-uploader/aksw-bibsonomy-uploader.jar" org.aksw.bibuploader.BibUpdater "$@"
+

@@ -31,7 +31,7 @@
 
     <modules>
         <module>bibsonomy-uploader-cli</module>
-        <!-- <module>bibsonomy-uploader-debian-cli</module> -->
+        <module>bibsonomy-uploader-debian-cli</module>
     </modules>
 
 
@@ -150,7 +150,13 @@
     </repositories>
 
     <dependencyManagement>
-        <dependencies>
+       <dependencies>
+            <dependency>
+                <groupId>org.aksw.bibsonomy</groupId>
+                <artifactId>bibsonomy-uploader-cli</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.bibsonomy</groupId>
                 <artifactId>bibsonomy-rest-client</artifactId>
