@@ -2,8 +2,7 @@ package org.aksw.bibuploader;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
@@ -14,17 +13,18 @@ import org.bibsonomy.common.enums.GroupingEntity;
 import org.bibsonomy.model.BibTex;
 import org.bibsonomy.model.Post;
 import org.bibsonomy.model.Resource;
-import org.bibsonomy.model.Tag;
 import org.bibsonomy.model.User;
-import org.bibsonomy.rest.client.Bibsonomy;
-import org.bibsonomy.rest.client.exception.ErrorPerformingRequestException;
+import org.bibsonomy.model.enums.Order;
+import org.bibsonomy.model.logic.LogicInterface;
+import org.bibsonomy.rest.client.RestLogicFactory;
 import org.bibsonomy.rest.client.queries.delete.DeletePostQuery;
 import org.bibsonomy.rest.client.queries.get.GetPostsQuery;
 import org.bibsonomy.rest.client.queries.post.CreatePostQuery;
+import org.bibsonomy.rest.renderer.xml.BibsonomyXML;
 
 public class BibUpdater {
 
-	private Bibsonomy bibClient;
+	private final LogicInterface logic;
 
 	private String username;
 
@@ -39,10 +39,8 @@ public class BibUpdater {
 		this.username = username;
 		this.fileLocation = fileLocation;
 
-		bibClient = new Bibsonomy();
-		bibClient.setUsername(username);
-		bibClient.setApiKey(apikey);
-		bibClient.setApiURL(apiurl);
+		final RestLogicFactory rlf = new RestLogicFactory();
+		logic = rlf.getLogicAccess(username, apikey);
 
 	}
 
@@ -71,9 +69,9 @@ public class BibUpdater {
 	}
 	
 	public void deleteEntry(Post<BibTex> post) throws Exception{
-		DeletePostQuery del = new DeletePostQuery(username, post
-				.getResource().getIntraHash());
-		bibClient.executeQuery(del);
+//		DeletePostQuery del = new DeletePostQuery(username, post.getResource().getIntraHash());
+		String intraHash = post.getResource().getIntraHash();
+		logic.deletePosts(username, Collections.<String>singletonList(intraHash));
 	}
 
 	private void flushNpush() throws Exception {
@@ -116,38 +114,47 @@ public class BibUpdater {
 
 	public List<Post<BibTex>> loadEntriesFromAccount() throws Exception {
 
-		GetPostsQuery postsQuery = new GetPostsQuery(0, 1000);
+//		GetPostsQuery postsQuery = new GetPostsQuery(0, 2000);
+//		
+//		
+//		postsQuery.setResourceType(BibTex.class);
+//
+//		postsQuery.setGrouping(GroupingEntity.USER, username);
+//
+//		bibClient.executeQuery(postsQuery);
+//
+//		List<Post<BibTex>> remoteList = new ArrayList<Post<BibTex>>();
+//
+//		for (Post<? extends Resource> post : postsQuery.getResult()) {
+//
+//			remoteList.add((Post<BibTex>) post);
+//		}
 		
-		
-		postsQuery.setResourceType(BibTex.class);
-
-		postsQuery.setGrouping(GroupingEntity.USER, username);
-
-		bibClient.executeQuery(postsQuery);
-
-		List<Post<BibTex>> remoteList = new ArrayList<Post<BibTex>>();
-
-		for (Post<? extends Resource> post : postsQuery.getResult()) {
-
-			remoteList.add((Post<BibTex>) post);
-		}
-		return remoteList;
+		List<Post<BibTex>> publications = logic.getPosts(BibTex.class, GroupingEntity.USER, "aksw", null, null, null, null, null, Order.ADDED, null, null, 0, 1000);
+		return publications;
 
 	}
 
-	public void uploadEntry(Post<BibTex> entry) throws Exception {
+	public void uploadEntry(Post<BibTex> entry) {
 
+//		entry.setUser(new User(this.username));
+//		
+//		if(entry.getTags()==null||entry.getTags().isEmpty()){
+//			entry.addTag("nokeyword");
+//			log.warn("Please add keywords for entry: " +  entry.getResource().getTitle());
+//		}
+//
+//		CreatePostQuery upload = new CreatePostQuery(this.username, entry);
+//		logix.executeQuery(upload);
+		
 		entry.setUser(new User(this.username));
 		
 		if(entry.getTags()==null||entry.getTags().isEmpty()){
 			entry.addTag("nokeyword");
 			log.warn("Please add keywords for entry: " +  entry.getResource().getTitle());
 		}
-
-		CreatePostQuery upload = new CreatePostQuery(this.username, entry);
-
-		this.bibClient.executeQuery(upload);
-
+		
+		logic.createPosts(Collections.<Post<? extends Resource>>singletonList(entry));
 	}
 
 	public void diffUpdate() throws Exception {
