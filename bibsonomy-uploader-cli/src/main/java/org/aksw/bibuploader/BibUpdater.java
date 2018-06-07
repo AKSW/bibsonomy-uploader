@@ -44,9 +44,29 @@ public class BibUpdater {
 
 	}
 
+	public BibUpdater(String fileLocation) {
+
+		log.debug("Creating a new BibChecker.");
+		this.fileLocation = fileLocation;
+
+	}
+
 	public static void main(String[] args) {
 
-		if (args.length != 4) {
+		if (args.length == 1) {
+
+			try {
+
+				BibUpdater checker = new BibUpdater(args[0]);
+				checker.loadEntriesFromFile();
+
+			} catch (Exception e) {
+
+			    throw new RuntimeException("Error occured:" + e.getMessage(), e);
+
+			}
+
+		} else if (args.length != 4) {
 
 			log.error("call with parameters: username apikey apiurl file");
 
@@ -75,6 +95,9 @@ public class BibUpdater {
 	}
 
 	private void flushNpush() throws Exception {
+		// load entries
+		List<Post<BibTex>> fileEntries = loadEntriesFromFile();
+
 		// get all previously posted entries
 		List<Post<BibTex>> accountEntries = loadEntriesFromAccount();
 
@@ -83,9 +106,6 @@ public class BibUpdater {
 			deleteEntry(post);
 			log.info(post.getResource().getTitle() + " deleted");
 		}
-
-		// load entries
-		List<Post<BibTex>> fileEntries = loadEntriesFromFile();
 
 		// upload them
 		for (Post<BibTex> post : fileEntries) {
