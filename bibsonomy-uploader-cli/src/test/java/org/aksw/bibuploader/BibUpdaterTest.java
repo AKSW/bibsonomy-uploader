@@ -38,7 +38,7 @@ public class BibUpdaterTest {
 	
 	@Test
 	public void loadEntriesFromAccount() throws Exception{
-		BibUpdater bibu = new BibUpdater("aksw", "10bf465ccaaf41b95ebf5da80ef0ba4f", "http://www.bibsonomy.org/api", "nothere");
+		BibUpdater bibu = new BibUpdater("aksw", "enterAPIkeyHERE", "http://www.bibsonomy.org/api", "nothere");
 				
 		log.info("***************\n\nFrom Account:");
 		int i =0;
