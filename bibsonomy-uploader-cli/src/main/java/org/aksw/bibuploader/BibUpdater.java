@@ -1,10 +1,5 @@
 package org.aksw.bibuploader;
 
-import java.io.FileInputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -17,10 +12,11 @@ import org.bibsonomy.model.User;
 import org.bibsonomy.model.enums.Order;
 import org.bibsonomy.model.logic.LogicInterface;
 import org.bibsonomy.rest.client.RestLogicFactory;
-import org.bibsonomy.rest.client.queries.delete.DeletePostQuery;
-import org.bibsonomy.rest.client.queries.get.GetPostsQuery;
-import org.bibsonomy.rest.client.queries.post.CreatePostQuery;
-import org.bibsonomy.rest.renderer.xml.BibsonomyXML;
+
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class BibUpdater {
 
@@ -48,7 +44,7 @@ public class BibUpdater {
 
 		log.debug("Creating a new BibChecker.");
 		this.fileLocation = fileLocation;
-
+		logic = null;
 	}
 
 	public static void main(String[] args) {
@@ -89,7 +85,6 @@ public class BibUpdater {
 	}
 	
 	public void deleteEntry(Post<BibTex> post) throws Exception{
-//		DeletePostQuery del = new DeletePostQuery(username, post.getResource().getIntraHash());
 		String intraHash = post.getResource().getIntraHash();
 		logic.deletePosts(username, Collections.<String>singletonList(intraHash));
 	}
@@ -134,39 +129,13 @@ public class BibUpdater {
 
 	public List<Post<BibTex>> loadEntriesFromAccount() throws Exception {
 
-//		GetPostsQuery postsQuery = new GetPostsQuery(0, 2000);
-//		
-//		
-//		postsQuery.setResourceType(BibTex.class);
-//
-//		postsQuery.setGrouping(GroupingEntity.USER, username);
-//
-//		bibClient.executeQuery(postsQuery);
-//
-//		List<Post<BibTex>> remoteList = new ArrayList<Post<BibTex>>();
-//
-//		for (Post<? extends Resource> post : postsQuery.getResult()) {
-//
-//			remoteList.add((Post<BibTex>) post);
-//		}
-		
-		List<Post<BibTex>> publications = logic.getPosts(BibTex.class, GroupingEntity.USER, "aksw", null, null, null, null, null, Order.ADDED, null, null, 0, 1000);
+		List<Post<BibTex>> publications = logic.getPosts(BibTex.class, GroupingEntity.USER, username, null, null, null, null, null, Order.ADDED, null, null, 0, 1000);
 		return publications;
 
 	}
 
 	public void uploadEntry(Post<BibTex> entry) {
 
-//		entry.setUser(new User(this.username));
-//		
-//		if(entry.getTags()==null||entry.getTags().isEmpty()){
-//			entry.addTag("nokeyword");
-//			log.warn("Please add keywords for entry: " +  entry.getResource().getTitle());
-//		}
-//
-//		CreatePostQuery upload = new CreatePostQuery(this.username, entry);
-//		logix.executeQuery(upload);
-		
 		entry.setUser(new User(this.username));
 		
 		if(entry.getTags()==null||entry.getTags().isEmpty()){
