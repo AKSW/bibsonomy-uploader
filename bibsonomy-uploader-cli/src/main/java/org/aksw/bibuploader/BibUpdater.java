@@ -113,7 +113,7 @@ public class BibUpdater {
 	public List<Post<BibTex>> loadEntriesFromFile() throws Exception {
 
 		String bibtexString = IOUtils.toString(new FileInputStream(
-				this.fileLocation));
+				this.fileLocation), "UTF-8");
 
 		PostBibTeXParser parser = new PostBibTeXParser();
 
