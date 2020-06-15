@@ -13,6 +13,15 @@ import org.bibsonomy.model.User;
 import org.bibsonomy.model.enums.Order;
 import org.bibsonomy.model.logic.LogicInterface;
 import org.bibsonomy.rest.client.RestLogicFactory;
+import org.javers.core.Javers;
+import org.javers.core.JaversBuilder;
+import org.javers.core.diff.Change;
+import org.javers.core.diff.Diff;
+import org.javers.core.diff.changetype.ObjectRemoved;
+import org.javers.core.diff.changetype.PropertyChange;
+import org.javers.core.diff.changetype.ReferenceChange;
+import org.javers.core.diff.changetype.ValueChange;
+import org.javers.core.diff.changetype.container.SetChange;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -193,11 +202,17 @@ public class BibUpdater {
 		Set<String> seen = new HashSet<String>();
 		fileEntries.removeIf(entry->!seen.add(entry.getResource().getIntraHash()));
 		
-		// present in B and in F, updates based on file entry
+		// present in B and in F, updates based on file entry if different
 		List<Post<BibTex>> intersection = getPaperIntersection(fileEntries, accountEntries);
 		for(Post<BibTex> post:intersection) {
-			updateEntry(post);
-			log.info(post.getResource().getTitle() + " updated");
+			Post<BibTex> matchingPost = accountEntries.stream().filter(a -> a.getResource().getIntraHash().equals(post.getResource().getIntraHash()))
+					.findFirst().orElse(null);
+			if(matchingPost != null && isSame(matchingPost, post)) {
+				log.info(post.getResource().getTitle() + " already there");
+			} else {
+				updateEntry(post);
+				log.info(post.getResource().getTitle() + " updated");
+			}
 		}
 		
 		// present in B, not in F, is removed
@@ -213,14 +228,14 @@ public class BibUpdater {
 	}
 	
 	public List<Post<BibTex>> loadAllEntriesFromAccount() throws Exception {
-		int max = 0;
+		int cur = 0;
 		final int max_entries = 1000;
 		
-		// it can retrieve only 1000 posts at a time
-		List<Post<BibTex>> publications = logic.getPosts(BibTex.class, GroupingEntity.USER, username, null, null, null, null, null, Order.ADDED, null, null, max, max+max_entries);
-		while(publications.size()==max+max_entries) {
-			max += max_entries;
-			List<Post<BibTex>> posts = logic.getPosts(BibTex.class, GroupingEntity.USER, username, null, null, null, null, null, Order.ADDED, null, null, max, max+max_entries);
+		// it can only retrieve 1000 posts at a time
+		List<Post<BibTex>> publications = logic.getPosts(BibTex.class, GroupingEntity.USER, username, null, null, null, null, null, Order.ADDED, null, null, cur, cur+max_entries);
+		while(publications.size()==cur+max_entries) {
+			cur += max_entries;
+			List<Post<BibTex>> posts = logic.getPosts(BibTex.class, GroupingEntity.USER, username, null, null, null, null, null, Order.ADDED, null, null, cur, cur+max_entries);
 			if(posts.isEmpty())
 				break;
 			publications.addAll(posts);
@@ -229,6 +244,7 @@ public class BibUpdater {
 		return publications;
 
 	}
+	
 	private void updateEntry(Post<BibTex> entry) {
 		entry.setUser(logic.getAuthenticatedUser());
 		List<Post<? extends Resource>> post = Collections.<Post<? extends Resource>>singletonList(entry);
@@ -236,7 +252,7 @@ public class BibUpdater {
 		
 	}
 	
-	public void deleteEntries(List<Post<BibTex>> posts) {
+	private void deleteEntries(List<Post<BibTex>> posts) {
 		logic.deletePosts(username, posts.stream().map(p -> p.getResource().getIntraHash()).collect(Collectors.toList()));
 	}
 	
@@ -250,6 +266,42 @@ public class BibUpdater {
 		 return list.stream()
 				.filter(b -> intersection.stream().noneMatch(i -> i.getResource().getIntraHash().equals(b.getResource().getIntraHash())))
 				.collect(Collectors.toList());
+	}
+	
+	public boolean isSame(Post<BibTex> accountEntry, Post<BibTex> filePost) {
+		
+		Javers javers = JaversBuilder.javers().build();
+		Diff diff = javers.compare(accountEntry, filePost);
+		
+		List<Change> changes = diff.getChanges();
+		if(changes.size()>7) {
+			return false;
+		}
+		
+		// Two papers are the same if only these changes occur
+		for (Change curChange : changes) {
+			String typeName = curChange.getAffectedGlobalId().getTypeName();
+			if (curChange instanceof ObjectRemoved) {
+				if(!(typeName.equals("org.bibsonomy.model.Group") || typeName.equals("org.bibsonomy.model.User"))) 
+					return false;
+			} else if (curChange instanceof ValueChange) {
+				String propertyName = ((ValueChange) curChange).getPropertyName();
+				if(!(typeName.equals("org.bibsonomy.model.Post") && (propertyName.equals("resource") || propertyName.equals("changeDate") || propertyName.equals("date")))) 
+					return false;
+			} else if (curChange instanceof ReferenceChange) {
+				String propertyName = ((ReferenceChange) curChange).getPropertyName();
+				if(!(typeName.equals("org.bibsonomy.model.Post") && propertyName.equals("user"))) 
+					return false;
+			} else if (curChange instanceof SetChange) {
+				String propertyName = ((SetChange) curChange).getPropertyName();
+				if(!(typeName.equals("org.bibsonomy.model.Post") && propertyName.equals("groups"))) 
+					return false;
+			} else {
+				// something else differs
+				return false;
+			}
+		}
+		return true;
 	}
 
 }
