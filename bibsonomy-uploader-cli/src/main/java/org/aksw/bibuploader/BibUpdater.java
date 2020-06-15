@@ -5,6 +5,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.bibsonomy.bibtex.parser.PostBibTeXParser;
 import org.bibsonomy.common.enums.GroupingEntity;
+import org.bibsonomy.common.enums.PostUpdateOperation;
 import org.bibsonomy.model.BibTex;
 import org.bibsonomy.model.Post;
 import org.bibsonomy.model.Resource;
@@ -16,7 +17,10 @@ import org.bibsonomy.rest.client.RestLogicFactory;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class BibUpdater {
 
@@ -73,7 +77,8 @@ public class BibUpdater {
 				BibUpdater update = new BibUpdater(args[0], args[1], args[2],
 						args[3]);
 				// update.diffUpdate();
-				update.flushNpush();
+				// update.flushNpush();
+				update.updateAccount();
 
 			} catch (Exception e) {
 
@@ -171,6 +176,80 @@ public class BibUpdater {
 			}
 		}
 
+	}
+	
+	/**
+	 * Updates the account entries (B) based on the file entries (F)
+	 * @throws Exception
+	 */
+	private void updateAccount() throws Exception {
+		// load entries
+		List<Post<BibTex>> fileEntries = loadEntriesFromFile();
+		
+		// get all previously posted entries
+		List<Post<BibTex>> accountEntries = loadAllEntriesFromAccount();
+		
+		//remove duplicates from file
+		Set<String> seen = new HashSet<String>();
+		fileEntries.removeIf(entry->!seen.add(entry.getResource().getIntraHash()));
+		
+		// present in B and in F, updates based on file entry
+		List<Post<BibTex>> intersection = getPaperIntersection(fileEntries, accountEntries);
+		for(Post<BibTex> post:intersection) {
+			updateEntry(post);
+			log.info(post.getResource().getTitle() + " updated");
+		}
+		
+		// present in B, not in F, is removed
+		List<Post<BibTex>> removeEntries = getExclusive(accountEntries, intersection);
+		deleteEntries(removeEntries);
+		
+		//present in F, not in B, is added
+		List<Post<BibTex>> addEntries = getExclusive(fileEntries, intersection);
+		for (Post<BibTex> post : addEntries) {
+			uploadEntry(post);
+			log.info(post.getResource().getTitle() + " uploaded");
+		}
+	}
+	
+	public List<Post<BibTex>> loadAllEntriesFromAccount() throws Exception {
+		int max = 0;
+		final int max_entries = 1000;
+		
+		// it can retrieve only 1000 posts at a time
+		List<Post<BibTex>> publications = logic.getPosts(BibTex.class, GroupingEntity.USER, username, null, null, null, null, null, Order.ADDED, null, null, max, max+max_entries);
+		while(publications.size()==max+max_entries) {
+			max += max_entries;
+			List<Post<BibTex>> posts = logic.getPosts(BibTex.class, GroupingEntity.USER, username, null, null, null, null, null, Order.ADDED, null, null, max, max+max_entries);
+			if(posts.isEmpty())
+				break;
+			publications.addAll(posts);
+			
+		}
+		return publications;
+
+	}
+	private void updateEntry(Post<BibTex> entry) {
+		entry.setUser(logic.getAuthenticatedUser());
+		List<Post<? extends Resource>> post = Collections.<Post<? extends Resource>>singletonList(entry);
+		logic.updatePosts(post, PostUpdateOperation.UPDATE_ALL);
+		
+	}
+	
+	public void deleteEntries(List<Post<BibTex>> posts) {
+		logic.deletePosts(username, posts.stream().map(p -> p.getResource().getIntraHash()).collect(Collectors.toList()));
+	}
+	
+	private List<Post<BibTex>> getPaperIntersection(List<Post<BibTex>> lista, List<Post<BibTex>> listb) {
+		 return lista.stream()
+		        .filter(f -> listb.stream().anyMatch(b -> b.getResource().getIntraHash().equals(f.getResource().getIntraHash())))
+		        .collect(Collectors.toList());
+	}
+	
+	private List<Post<BibTex>> getExclusive(List<Post<BibTex>> list, List<Post<BibTex>> intersection) {
+		 return list.stream()
+				.filter(b -> intersection.stream().noneMatch(i -> i.getResource().getIntraHash().equals(b.getResource().getIntraHash())))
+				.collect(Collectors.toList());
 	}
 
 }
