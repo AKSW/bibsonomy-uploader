@@ -205,14 +205,10 @@ public class BibUpdater {
 		
 		// present in B and in F, updates based on file entry if different
 		List<Post<BibTex>> intersection = getPaperIntersection(fileEntries, accountEntries);
-		//int alCount = 0;
 		for(Post<BibTex> post:intersection) {
 			Post<BibTex> matchingPost = accountEntries.stream().filter(a -> a.getResource().getIntraHash().equals(post.getResource().getIntraHash()))
 					.findFirst().orElse(null);
-			if(post.getResource().getTitle().equals("FAIR.ReD: Semantic knowledge graph infrastructure for the life sciences"))
-				System.out.println();
 			if(matchingPost != null && isSame(matchingPost, post)) {
-				//alCount++;
 				log.info(post.getResource().getTitle() + " already there");
 			} else {
 				updateEntry(post);
@@ -275,6 +271,9 @@ public class BibUpdater {
 	
 	public boolean isSame(Post<BibTex> accountEntry, Post<BibTex> filePost) {
 		
+		if(filePost.getTags()==null||filePost.getTags().isEmpty())
+			filePost.addTag("nokeyword");
+		
 		Javers javers = JaversBuilder.javers().build();
 		Diff diff = javers.compare(accountEntry, filePost);
 		
@@ -284,8 +283,6 @@ public class BibUpdater {
 		for (Change curChange : changes) {
 			String typeName = curChange.getAffectedGlobalId().getTypeName();
 			if (curChange instanceof ObjectRemoved) {
-				if(typeName.equals("org.bibsonomy.model.Tag") && accountEntry.getTags().contains(new Tag("nokeyword"))) 
-					continue;
 				if(!(typeName.equals("org.bibsonomy.model.Group") || typeName.equals("org.bibsonomy.model.User"))) 
 					return false;
 			} else if (curChange instanceof ValueChange) {
@@ -298,8 +295,6 @@ public class BibUpdater {
 					return false;
 			} else if (curChange instanceof SetChange) {
 				String propertyName = ((SetChange) curChange).getPropertyName();
-				if(typeName.equals("org.bibsonomy.model.Post") && propertyName.equals("tags") && accountEntry.getTags().contains(new Tag("nokeyword")))
-					continue;
 				if(!(typeName.equals("org.bibsonomy.model.Post") && propertyName.equals("groups"))) 
 					return false;
 			} else {
