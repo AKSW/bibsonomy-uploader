@@ -14,6 +14,7 @@ import org.bibsonomy.model.User;
 import org.bibsonomy.model.enums.Order;
 import org.bibsonomy.model.logic.LogicInterface;
 import org.bibsonomy.rest.client.RestLogicFactory;
+import org.bibsonomy.util.StringUtils;
 import org.javers.core.Javers;
 import org.javers.core.JaversBuilder;
 import org.javers.core.diff.Change;
@@ -28,6 +29,7 @@ import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -44,7 +46,6 @@ public class BibUpdater {
 
 	public BibUpdater(String username, String apikey, String apiurl,
 			String fileLocation) {
-
 		log.debug("Creating a new BibUpdater.");
 		this.username = username;
 		this.fileLocation = fileLocation;
@@ -149,7 +150,7 @@ public class BibUpdater {
 
 	}
 
-	public void uploadEntry(Post<BibTex> entry) {
+	public List<String> uploadEntry(Post<BibTex> entry) {
 
 		entry.setUser(new User(this.username));
 		
@@ -158,7 +159,8 @@ public class BibUpdater {
 			log.warn("Please add keywords for entry: " +  entry.getResource().getTitle());
 		}
 		
-		logic.createPosts(Collections.<Post<? extends Resource>>singletonList(entry));
+		return logic.createPosts(Collections.<Post<? extends Resource>>singletonList(entry));
+		
 	}
 
 	public void diffUpdate() throws Exception {
@@ -199,33 +201,51 @@ public class BibUpdater {
 		// get all previously posted entries
 		List<Post<BibTex>> accountEntries = loadAllEntriesFromAccount();
 		
-		//remove duplicates from file
+		Summary summary = new Summary();
+		
+		//remove duplicates from file and identifies posts with missing keywords
 		Set<String> seen = new HashSet<String>();
-		fileEntries.removeIf(entry->!seen.add(entry.getResource().getIntraHash()));
+		Iterator<Post<BibTex>> iter = fileEntries.iterator();
+		while(iter.hasNext()) {
+			Post<BibTex> entry = iter.next();
+			if(entry.getTags()==null || entry.getTags().isEmpty())
+				summary.addNoTagEntry(entry.getResource().getTitle());
+			
+			if(!seen.add(entry.getResource().getIntraHash())) {
+				summary.addDuplicate(entry.getResource().getTitle());
+				iter.remove();
+			}
+		}
 		
 		// present in B and in F, updates based on file entry if different
 		List<Post<BibTex>> intersection = getPaperIntersection(fileEntries, accountEntries);
 		for(Post<BibTex> post:intersection) {
 			Post<BibTex> matchingPost = accountEntries.stream().filter(a -> a.getResource().getIntraHash().equals(post.getResource().getIntraHash()))
 					.findFirst().orElse(null);
-			if(matchingPost != null && isSame(matchingPost, post)) {
-				log.info(post.getResource().getTitle() + " already there");
-			} else {
+			if(!(matchingPost != null && isSame(matchingPost, post))) {
 				updateEntry(post);
-				log.info(post.getResource().getTitle() + " updated");
+				summary.addUpdate();
 			}
 		}
 		
 		// present in B, not in F, is removed
 		List<Post<BibTex>> removeEntries = getExclusive(accountEntries, intersection);
 		deleteEntries(removeEntries);
+		summary.setRemoved(removeEntries.size());
 		
 		//present in F, not in B, is added
 		List<Post<BibTex>> addEntries = getExclusive(fileEntries, intersection);
 		for (Post<BibTex> post : addEntries) {
-			uploadEntry(post);
-			log.info(post.getResource().getTitle() + " uploaded");
+			String postTitle = post.getResource().getTitle();
+			if(uploadEntry(post).isEmpty()) {
+				log.warn(postTitle+" failed to upload");
+				summary.addFailAdd(postTitle);
+			} else {
+				summary.addSucAdd();
+				log.info(postTitle + " uploaded");
+			}			
 		}
+		log.info(summary.toString());
 	}
 	
 	public List<Post<BibTex>> loadAllEntriesFromAccount() throws Exception {
@@ -306,3 +326,4 @@ public class BibUpdater {
 	}
 
 }
+
